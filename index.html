@@ -479,31 +479,59 @@ function doSetup(){
 function initSB(key){
   document.getElementById('loading').classList.add('show');
   document.getElementById('load-msg').textContent='Свързване с Supabase...';
+  // Timeout fallback — if loading takes > 8 sec, show app anyway
+  var timeout = setTimeout(function(){
+    if(document.getElementById('loading').classList.contains('show')){
+      STATE = getDefaultState();
+      showApp();
+      setStatus('⚠ Timeout. Провери SQL в Supabase.');
+    }
+  }, 8000);
   try{
     sb = supabase.createClient(SB_URL, key);
     document.getElementById('load-msg').textContent='Зареждане на бюлетина...';
-    loadBulletin();
+    loadBulletin().then(function(){clearTimeout(timeout);}).catch(function(e){
+      clearTimeout(timeout);STATE=getDefaultState();showApp();
+      setStatus('⚠ Грешка: '+e.message+' — Пусни SQL кода в Supabase.');
+    });
     loadRecipients();
   }catch(e){
+    clearTimeout(timeout);
     document.getElementById('load-msg').textContent='Грешка: '+e.message;
+    setTimeout(function(){STATE=getDefaultState();showApp();setStatus('⚠ '+e.message);},2000);
   }
 }
 
 // ── LOAD / SAVE ──────────────────────────────────────────────────────────────
 async function loadBulletin(){
-  var {data,error} = await sb.from('bulletins').select('*').order('published_at',{ascending:false}).limit(1);
-  if(error){setStatus('Грешка: '+error.message);return;}
-  STATE = (data&&data.length) ? data[0].state : getDefaultState();
-  await loadCompletions();
-  showApp();
-  // Subscribe to real-time changes
-  sb.channel('bulletins').on('postgres_changes',{event:'*',schema:'public',table:'bulletins'},function(payload){
-    if(payload.new&&payload.new.state){STATE=payload.new.state;render();showToast('🔄 Бюлетинът е обновен','#3b82f6');}
-  }).subscribe();
-  // Subscribe to completion changes
-  sb.channel('completions').on('postgres_changes',{event:'*',schema:'public',table:'completions'},function(){
-    loadCompletions().then(function(){renderCalendar();renderTrackDashboard();});
-  }).subscribe();
+  try{
+    var {data,error} = await sb.from('bulletins').select('*').order('published_at',{ascending:false}).limit(1);
+    if(error){
+      // Tables might not exist yet — show app with default state
+      console.warn('Bulletins load error (таблиците може да не съществуват все още):', error.message);
+      STATE = getDefaultState();
+      setStatus('⚠ Базата данни не е готова. Пусни SQL кода в Supabase → SQL Editor.');
+    } else {
+      STATE = (data&&data.length) ? data[0].state : getDefaultState();
+      setStatus('● Свързан · '+STATE.week);
+    }
+    await loadCompletions().catch(function(){});
+    showApp();
+    // Real-time subscriptions
+    try{
+      sb.channel('bulletins').on('postgres_changes',{event:'*',schema:'public',table:'bulletins'},function(payload){
+        if(payload.new&&payload.new.state){STATE=payload.new.state;render();showToast('🔄 Бюлетинът е обновен','#3b82f6');}
+      }).subscribe();
+      sb.channel('completions').on('postgres_changes',{event:'*',schema:'public',table:'completions'},function(){
+        loadCompletions().then(function(){renderCalendar();renderTrackDashboard();}).catch(function(){});
+      }).subscribe();
+    }catch(e){}
+  }catch(e){
+    console.error('loadBulletin error:', e);
+    STATE = getDefaultState();
+    setStatus('⚠ Проблем с връзката. Провери Supabase.');
+    showApp();
+  }
 }
 
 async function loadCompletions(){
@@ -519,13 +547,15 @@ async function loadCompletions(){
 }
 
 async function loadRecipients(){
-  var {data,error} = await sb.from('recipients').select('*');
-  if(error)return;
-  _recipients = {trade:[],wh:[],adm:[]};
-  (data||[]).forEach(function(r){
-    if(_recipients[r.category])_recipients[r.category].push({id:r.id,name:r.name,email:r.email,store:r.store||''});
-  });
-  renderEmailPanel();
+  try{
+    var {data,error} = await sb.from('recipients').select('*');
+    if(error)return;
+    _recipients = {trade:[],wh:[],adm:[]};
+    (data||[]).forEach(function(r){
+      if(_recipients[r.category])_recipients[r.category].push({id:r.id,name:r.name,email:r.email,store:r.store||''});
+    });
+    renderEmailPanel();
+  }catch(e){console.warn('loadRecipients:',e);}
 }
 
 async function publish(){
@@ -1050,10 +1080,15 @@ document.addEventListener('click',function(e){if(e.target.classList.contains('ov
 
 // ── STARTUP ──────────────────────────────────────────────────────────────────
 (function(){
-  var done=localStorage.getItem('tb_setup_done');
   var name=localStorage.getItem('tb_name');
-  if(done&&name){initSB(SB_KEY);}
-  else{document.getElementById('setup').classList.add('show');}
+  if(name){
+    // Already set up — connect directly
+    initSB(SB_KEY);
+  } else {
+    // First visit — show setup screen
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('setup').classList.add('show');
+  }
 })();
 </script>
 </body>
