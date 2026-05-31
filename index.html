@@ -305,7 +305,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 <div id="scr-settings" class="scr">
   <div class="ocr-info">
     <i class="ti ti-scan" aria-hidden="true"></i>
-    <div class="ocr-info-text"><strong>OCR.space</strong> — безплатни 25 000 снимки/месец, само с имейл регистрация. Без OCR ключ работи резервен метод в браузъра.</div>
+    <div class="ocr-info-text"><strong>Google Gemini AI</strong> — препоръчано. Безплатно само с Google акаунт. Чете LCD дисплеи максимално точно. Настрой от Настройки.</div>
   </div>
 
   <div class="settings-card">
@@ -317,16 +317,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
     </div>
   </div>
 
+  <div class="settings-card" style="border-color:var(--green)">
+    <div class="settings-hdr" style="background:var(--grn-bg);color:var(--green)">⭐ Google Gemini — препоръчано (безплатно)</div>
+    <div class="settings-body">
+      <div class="fg" style="margin:0"><label>Gemini API ключ</label><input type="text" id="sGeminiKey" placeholder="AIzaSy..." style="font-family:monospace;font-size:13px"></div>
+      <div class="hint">
+        <b>Безплатно, само с Google акаунт:</b><br>
+        1. Отвори <b>aistudio.google.com</b><br>
+        2. Влез с Google акаунта си → "Get API key"<br>
+        3. "Create API key" → копирай → постави тук<br>
+        <br>
+        Gemini е AI модел — чете дисплея като човек. Максимално точно.
+      </div>
+    </div>
+  </div>
+
   <div class="settings-card">
-    <div class="settings-hdr">OCR.space — разчитане на снимки (безплатно)</div>
+    <div class="settings-hdr">OCR.space — резервен метод (безплатно)</div>
     <div class="settings-body">
       <div class="fg" style="margin:0"><label>API ключ от ocr.space</label><input type="text" id="sOcrKey" placeholder="K8xxxxxxxxxxxxxxx" style="font-family:monospace;font-size:13px"></div>
-      <div class="hint">
-        <b>Безплатно, без кредитна карта:</b><br>
-        1. Отвори <b>ocr.space/ocrapi/freekey</b><br>
-        2. Въведи имейла си → получаваш ключ веднага<br>
-        3. Постави го тук → снимките се разчитат автоматично
-      </div>
+      <div class="hint">Резервен OCR при липса на Gemini ключ. Регистрация на ocr.space/ocrapi/freekey</div>
     </div>
   </div>
 
@@ -395,8 +405,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <script>
-var API_URL  = localStorage.getItem('patna_api_url')  || '';
-var OCR_KEY  = localStorage.getItem('patna_ocr_key')  || '';
+var API_URL    = localStorage.getItem('patna_api_url')    || '';
+var OCR_KEY    = localStorage.getItem('patna_ocr_key')    || '';
+var GEMINI_KEY = localStorage.getItem('patna_gemini_key') || '';
 var MONTHS  = ['','Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
 var settings = JSON.parse(localStorage.getItem('patna_settings') || '{"car_reg":"СВ0773МХ","car_make":"Дачия","default_route":"Димитровград - Кърджали - Димитровград"}');
 var entries  = [];
@@ -505,6 +516,26 @@ async function handleImage(input) {
   img.src = url;
 }
 
+async function ocrWithGemini(base64Image, mimeType) {
+  var payload = {
+    contents: [{
+      parts: [
+        { inline_data: { mime_type: mimeType, data: base64Image } },
+        { text: "This is a car odometer display. What is the exact odometer reading shown? Reply with ONLY the digits, nothing else. No spaces, no dots, no 'km'. Just the number. Example: 151412" }
+      ]
+    }],
+    generationConfig: { maxOutputTokens: 20, temperature: 0 }
+  };
+  var r = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + GEMINI_KEY,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+  );
+  var d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  var text = d.candidates[0].content.parts[0].text.trim().replace(/[^\d]/g, '');
+  return parseInt(text) || null;
+}
+
 async function runOCR(canvas, ctx, img, file, url) {
   var W = Math.min(img.width, 1400);
   var H = Math.round(img.height * W / img.width);
@@ -581,7 +612,21 @@ async function runOCR(canvas, ctx, img, file, url) {
   var src = makeCanvas();
   var results = [];
 
-  // ── PRIMARY: OCR.space API (безплатно, много по-точно за LCD дисплеи) ──
+  // ── МЕТОД 1: Google Gemini AI (най-точен — чете като човек) ──
+  if (GEMINI_KEY) {
+    setProgress(15, 'Gemini AI разчита дисплея...');
+    try {
+      var b64raw = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+      var kmG = await ocrWithGemini(b64raw, 'image/jpeg');
+      if (kmG && kmG >= 1000 && kmG <= 9999999) {
+        setProgress(100, 'Готово!');
+        return kmG;
+      }
+    } catch(ge) { console.warn('Gemini error:', ge.message); }
+    setProgress(30, 'Опитва OCR.space...');
+  }
+
+  // ── МЕТОД 2: OCR.space API ──
   if (OCR_KEY) {
     setProgress(20, 'OCR.space разчита снимката...');
     try {
@@ -605,7 +650,7 @@ async function runOCR(canvas, ctx, img, file, url) {
       }
     } catch(ocrErr) { /* fallback to Tesseract */ }
     setProgress(40, 'Опитва резервен метод...');
-  } else {
+  } else if (!GEMINI_KEY) {
     setProgress(15, 'Изолира оранжевите цифри...');
   }
   var orangeCanvas = orangeFilter(src);
@@ -973,13 +1018,16 @@ function applySettings() {
     document.getElementById('fTo').value    = parts[1] || '';
     document.getElementById('fRoute').value = settings.default_route;
   }
-  document.getElementById('sOcrKey').value = OCR_KEY;
+  document.getElementById('sOcrKey').value    = OCR_KEY;
+  document.getElementById('sGeminiKey').value = GEMINI_KEY;
 }
 function saveSettings() {
   var url    = document.getElementById('sUrl').value.trim();
-  var ocrKey = document.getElementById('sOcrKey').value.trim();
-  if (url)    { API_URL  = url;    localStorage.setItem('patna_api_url', url); }
-  if (ocrKey) { OCR_KEY  = ocrKey; localStorage.setItem('patna_ocr_key', ocrKey); }
+  var ocrKey    = document.getElementById('sOcrKey').value.trim();
+  var geminiKey = document.getElementById('sGeminiKey').value.trim();
+  if (url)       { API_URL    = url;       localStorage.setItem('patna_api_url',    url); }
+  if (ocrKey)    { OCR_KEY    = ocrKey;    localStorage.setItem('patna_ocr_key',    ocrKey); }
+  if (geminiKey) { GEMINI_KEY = geminiKey; localStorage.setItem('patna_gemini_key', geminiKey); }
   settings = {
     car_reg:       document.getElementById('sReg').value.trim().toUpperCase(),
     car_make:      document.getElementById('sMake').value.trim(),
