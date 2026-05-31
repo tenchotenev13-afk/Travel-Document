@@ -597,7 +597,7 @@ async function runOCR(canvas, ctx, img, file, url) {
       var json = await resp.json();
       if (!json.IsErroredOnProcessing && json.ParsedResults && json.ParsedResults[0]) {
         var txt = json.ParsedResults[0].ParsedText || '';
-        var km0 = extractKm(txt);
+        var km0 = smartCorrectKm(extractKm(txt));
         if (km0) {
           setProgress(100, 'Готово!');
           return km0;
@@ -613,7 +613,7 @@ async function runOCR(canvas, ctx, img, file, url) {
     tessedit_char_whitelist: '0123456789',
     tessedit_pageseg_mode: '7',
   });
-  var km1 = extractKm(r1.data.text);
+  var km1 = smartCorrectKm(extractKm(r1.data.text));
   if (km1) results.push({ km: km1, conf: r1.data.confidence + 20 }); // bonus for orange filter
 
   setProgress(40, 'Пробва мащабиране...');
@@ -622,7 +622,7 @@ async function runOCR(canvas, ctx, img, file, url) {
     tessedit_char_whitelist: '0123456789',
     tessedit_pageseg_mode: '7',
   });
-  var km2 = extractKm(r2.data.text);
+  var km2 = smartCorrectKm(extractKm(r2.data.text));
   if (km2) results.push({ km: km2, conf: r2.data.confidence + 15 });
 
   setProgress(65, 'Разчита оригинала...');
@@ -630,7 +630,7 @@ async function runOCR(canvas, ctx, img, file, url) {
     tessedit_char_whitelist: '0123456789',
     tessedit_pageseg_mode: '6',
   });
-  var km3 = extractKm(r3.data.text);
+  var km3 = smartCorrectKm(extractKm(r3.data.text));
   if (km3) results.push({ km: km3, conf: r3.data.confidence });
 
   setProgress(85, 'Пробва инверсия...');
@@ -639,7 +639,7 @@ async function runOCR(canvas, ctx, img, file, url) {
     tessedit_char_whitelist: '0123456789',
     tessedit_pageseg_mode: '7',
   });
-  var km4 = extractKm(r4.data.text);
+  var km4 = smartCorrectKm(extractKm(r4.data.text));
   if (km4) results.push({ km: km4, conf: r4.data.confidence });
 
   setProgress(100, 'Готово!');
@@ -658,7 +658,7 @@ async function runOCR(canvas, ctx, img, file, url) {
 
 function extractKm(text) {
   // Find sequences of 4-7 digits (km range: 1000 - 9999999)
-  var clean   = text.replace(/\s/g, '');
+  var clean   = text.replace(/[\s.,]/g, '');
   var matches = clean.match(/\d{4,7}/g);
   if (!matches) return null;
   // Prefer 5-6 digit numbers (most common odometer range)
@@ -669,6 +669,39 @@ function extractKm(text) {
   });
   var km = parseInt(sorted[0]);
   return (km >= 1000 && km <= 9999999) ? km : null;
+}
+
+// Автоматична корекция на изпуснати водещи цифри (напр. 51558 → 151558)
+function smartCorrectKm(km) {
+  if (!km) return km;
+  var lastKm = parseInt(localStorage.getItem('patna_last_km')) || 0;
+  if (!lastKm) return km;
+
+  // Ако разчетеното е с повече от 5000 по-малко от последното — вероятно липсва цифра
+  if (km < lastKm - 5000) {
+    // Опитай да добавиш цифри отпред
+    var candidates = [
+      parseInt('1' + km),
+      parseInt('2' + km),
+      parseInt('3' + km)
+    ];
+    // Намери кандидата, който е най-близо до lastKm и в разумен диапазон (+/-50000)
+    var best = null, bestDiff = Math.abs(km - lastKm);
+    candidates.forEach(function(c) {
+      if (c > 0 && c <= 9999999) {
+        var diff = Math.abs(c - lastKm);
+        if (diff < bestDiff && diff < 50000) {
+          bestDiff = diff;
+          best = c;
+        }
+      }
+    });
+    if (best) {
+      console.log('Smart correction: ' + km + ' → ' + best + ' (last: ' + lastKm + ')');
+      return best;
+    }
+  }
+  return km;
 }
 
 function setProgress(pct, txt) {
