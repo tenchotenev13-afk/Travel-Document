@@ -173,11 +173,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
     <i class="ti ti-speedometer" style="font-size:28px;color:var(--txt3)" aria-hidden="true"></i>
   </div>
 
-  <input type="file" id="imgInput" accept="image/*" capture="environment" style="display:none" onchange="handleImage(this)">
+  <input type="file" id="imgCamera"  accept="image/*" capture="environment" style="display:none" onchange="handleImage(this)">
+  <input type="file" id="imgGallery" accept="image/*" style="display:none" onchange="handleImage(this)">
 
-  <button class="cam-btn" onclick="document.getElementById('imgInput').click()">
-    <i class="ti ti-camera" aria-hidden="true"></i>Снимай километража
-  </button>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+    <button class="cam-btn" style="margin:0;padding:16px;font-size:15px" onclick="document.getElementById('imgCamera').click()">
+      <i class="ti ti-camera" aria-hidden="true"></i>Снимай сега
+    </button>
+    <button class="cam-btn" style="margin:0;padding:16px;font-size:15px;background:#444" onclick="document.getElementById('imgGallery').click()">
+      <i class="ti ti-photo" aria-hidden="true"></i>От галерия
+    </button>
+  </div>
 
   <!-- Preview + OCR result -->
   <div class="preview-box" id="previewBox">
@@ -486,53 +492,127 @@ async function handleImage(input) {
 }
 
 async function runOCR(canvas, ctx, img, file, url) {
-  // Preprocess: create high-contrast copy for better OCR
-  var ocCanvas = document.createElement('canvas');
-  ocCanvas.width  = Math.min(img.width, 1200);
-  ocCanvas.height = Math.round(img.height * ocCanvas.width / img.width);
-  var ocCtx = ocCanvas.getContext('2d');
-  ocCtx.drawImage(img, 0, 0, ocCanvas.width, ocCanvas.height);
+  var W = Math.min(img.width, 1400);
+  var H = Math.round(img.height * W / img.width);
 
-  // Increase contrast + grayscale
-  var imageData = ocCtx.getImageData(0, 0, ocCanvas.width, ocCanvas.height);
-  var data = imageData.data;
-  for (var i = 0; i < data.length; i += 4) {
-    var gray = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
-    // High contrast threshold
-    var val  = gray > 128 ? 255 : 0;
-    data[i] = data[i+1] = data[i+2] = val;
+  // ── Helper: draw img to new canvas ──
+  function makeCanvas() {
+    var c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    c.getContext('2d').drawImage(img, 0, 0, W, H);
+    return c;
   }
-  ocCtx.putImageData(imageData, 0, 0);
 
-  setProgress(20, 'Зарежда OCR модела...');
+  // ── Method 1: Isolate ORANGE pixels (HSV filter) ──
+  // Best for Dacia/Renault orange LCD on dark red background
+  function orangeFilter(srcCanvas) {
+    var sc = srcCanvas.getContext('2d');
+    var id = sc.getImageData(0, 0, W, H);
+    var d  = id.data;
+    var out = document.createElement('canvas');
+    out.width = W; out.height = H;
+    var oc  = out.getContext('2d');
+    var od  = oc.createImageData(W, H);
+    var odd = od.data;
+    for (var i = 0; i < d.length; i += 4) {
+      var r = d[i]/255, g = d[i+1]/255, b = d[i+2]/255;
+      var max = Math.max(r,g,b), min = Math.min(r,g,b), delta = max - min;
+      var h = 0, s = max > 0 ? delta/max : 0, v = max;
+      if (delta > 0) {
+        if (max === r)      h = 60 * (((g-b)/delta) % 6);
+        else if (max === g) h = 60 * ((b-r)/delta + 2);
+        else                h = 60 * ((r-g)/delta + 4);
+      }
+      if (h < 0) h += 360;
+      // Orange: H=15-50°, high saturation, medium-high brightness
+      var isOrange = h >= 12 && h <= 52 && s > 0.40 && v > 0.22;
+      var val = isOrange ? 0 : 255; // black digits on white bg
+      odd[i] = odd[i+1] = odd[i+2] = val;
+      odd[i+3] = 255;
+    }
+    oc.putImageData(od, 0, 0);
+    return out;
+  }
 
-  // Run Tesseract on ORIGINAL (better for styled displays) and preprocessed
+  // ── Method 2: Invert + high contrast (for white/light digits) ──
+  function invertContrast(srcCanvas) {
+    var sc = srcCanvas.getContext('2d');
+    var id = sc.getImageData(0, 0, W, H);
+    var d  = id.data;
+    var out = document.createElement('canvas');
+    out.width = W; out.height = H;
+    var oc = out.getContext('2d');
+    var od = oc.createImageData(W, H);
+    var odd = od.data;
+    for (var i = 0; i < d.length; i += 4) {
+      var gray = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      var val  = gray < 128 ? 255 : 0;
+      odd[i] = odd[i+1] = odd[i+2] = val;
+      odd[i+3] = 255;
+    }
+    oc.putImageData(od, 0, 0);
+    return out;
+  }
+
+  // ── Method 3: Scale up 2x for small displays ──
+  function scaleUp(srcCanvas) {
+    var out = document.createElement('canvas');
+    out.width = W*2; out.height = H*2;
+    var oc = out.getContext('2d');
+    oc.imageSmoothingEnabled = false;
+    oc.drawImage(srcCanvas, 0, 0, W*2, H*2);
+    return out;
+  }
+
+  var src = makeCanvas();
   var results = [];
 
-  // Try 1: Original image, digits only
-  setProgress(40, 'Разчита оригиналната снимка...');
-  var r1 = await Tesseract.recognize(url, 'eng', {
+  setProgress(15, 'Изолира оранжевите цифри...');
+  var orangeCanvas = orangeFilter(src);
+  var r1 = await Tesseract.recognize(orangeCanvas.toDataURL(), 'eng', {
     tessedit_char_whitelist: '0123456789',
-    tessedit_pageseg_mode:   '6',
+    tessedit_pageseg_mode: '7',
   });
   var km1 = extractKm(r1.data.text);
-  if (km1) results.push({ km: km1, conf: r1.data.confidence });
+  if (km1) results.push({ km: km1, conf: r1.data.confidence + 20 }); // bonus for orange filter
 
-  // Try 2: Preprocessed, digits only
-  setProgress(70, 'Обработва изображението...');
-  var r2 = await Tesseract.recognize(ocCanvas.toDataURL(), 'eng', {
+  setProgress(40, 'Пробва мащабиране...');
+  var scaledOrange = scaleUp(orangeCanvas);
+  var r2 = await Tesseract.recognize(scaledOrange.toDataURL(), 'eng', {
     tessedit_char_whitelist: '0123456789',
-    tessedit_pageseg_mode:   '6',
+    tessedit_pageseg_mode: '7',
   });
   var km2 = extractKm(r2.data.text);
-  if (km2) results.push({ km: km2, conf: r2.data.confidence });
+  if (km2) results.push({ km: km2, conf: r2.data.confidence + 15 });
+
+  setProgress(65, 'Разчита оригинала...');
+  var r3 = await Tesseract.recognize(url, 'eng', {
+    tessedit_char_whitelist: '0123456789',
+    tessedit_pageseg_mode: '6',
+  });
+  var km3 = extractKm(r3.data.text);
+  if (km3) results.push({ km: km3, conf: r3.data.confidence });
+
+  setProgress(85, 'Пробва инверсия...');
+  var invCanvas = invertContrast(src);
+  var r4 = await Tesseract.recognize(invCanvas.toDataURL(), 'eng', {
+    tessedit_char_whitelist: '0123456789',
+    tessedit_pageseg_mode: '7',
+  });
+  var km4 = extractKm(r4.data.text);
+  if (km4) results.push({ km: km4, conf: r4.data.confidence });
 
   setProgress(100, 'Готово!');
 
   if (!results.length) return null;
 
-  // Pick the result with highest confidence
-  results.sort(function(a,b){ return b.conf - a.conf; });
+  // Prefer the km that appears most often, then highest confidence
+  var freq = {};
+  results.forEach(function(r){ freq[r.km] = (freq[r.km]||0) + 1; });
+  results.sort(function(a,b){
+    var fd = freq[b.km] - freq[a.km];
+    return fd !== 0 ? fd : b.conf - a.conf;
+  });
   return results[0].km;
 }
 
