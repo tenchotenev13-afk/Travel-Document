@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#1e1e1e"/>
+  <!-- Road -->
+  <path d="M256 420 L160 320 L160 200 Q160 180 180 180 L332 180 Q352 180 352 200 L352 320 Z" fill="#2d2d2d" stroke="#444" stroke-width="2"/>
+  <!-- Road lines -->
+  <rect x="248" y="200" width="16" height="30" rx="4" fill="#f0a500"/>
+  <rect x="248" y="252" width="16" height="30" rx="4" fill="#f0a500"/>
+  <rect x="248" y="304" width="16" height="30" rx="4" fill="#f0a500"/>
+  <!-- Speedometer arc -->
+  <path d="M130 260 A130 130 0 0 1 382 260" fill="none" stroke="#333" stroke-width="28" stroke-linecap="round"/>
+  <path d="M130 260 A130 130 0 0 1 290 138" fill="none" stroke="#e53935" stroke-width="28" stroke-linecap="round"/>
+  <!-- Needle -->
+  <line x1="256" y1="260" x2="200" y2="158" stroke="#e53935" stroke-width="10" stroke-linecap="round"/>
+  <!-- Center dot -->
+  <circle cx="256" cy="260" r="18" fill="#e53935"/>
+  <circle cx="256" cy="260" r="8" fill="#fff"/>
+  <!-- Speed marks -->
+  <line x1="130" y1="260" x2="150" y2="260" stroke="#666" stroke-width="4" stroke-linecap="round"/>
+  <line x1="382" y1="260" x2="362" y2="260" stroke="#666" stroke-width="4" stroke-linecap="round"/>
+  <line x1="256" y1="132" x2="256" y2="152" stroke="#666" stroke-width="4" stroke-linecap="round"/>
+  <!-- KM text -->
+  <text x="256" y="340" text-anchor="middle" font-family="Arial,sans-serif" font-size="38" font-weight="700" fill="#fff" letter-spacing="2">КМ</text>
+  <!-- Bottom text -->
+  <text x="256" y="390" text-anchor="middle" font-family="Arial,sans-serif" font-size="22" font-weight="500" fill="#888" letter-spacing="3">ПЪТНА</text>
+</svg>
