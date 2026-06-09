@@ -365,10 +365,11 @@ function setLastKm(km){localStorage.setItem('patna_last_km',String(km))}
 // Key rule: morning km = today.start = yesterday.end
 // km_driven for day = next_day.start - this_day.start
 function saveEntry(){
-  var km    = parseInt(document.getElementById('kmInput').value);
+  var raw   = String(document.getElementById('kmInput').value).replace(/[^0-9]/g,'');
+  var km    = parseInt(raw);
   var route = document.getElementById('fRoute').value.trim();
   var date  = document.getElementById('fDate').value;
-  if(!km||km<1000){toast('Въведи валиден километраж',true);return}
+  if(!km||isNaN(km)||km<10){toast('Въведи валиден километраж (само цифри)',true);return}
   if(!date){toast('Избери дата',true);return}
 
   var btn=document.getElementById('saveBtn');
@@ -430,7 +431,7 @@ function completePreviousEntry(todayKm, todayDate){
 }
 
 function onKmChange(){
-  var km   = parseInt(document.getElementById('kmInput').value)||0;
+  var km   = parseInt(String(document.getElementById('kmInput').value).replace(/[^0-9]/g,''))||0;
   var last = getLastKm();
   var diff = document.getElementById('kmDiff');
   if(km>1000 && last>1000 && km>last){
