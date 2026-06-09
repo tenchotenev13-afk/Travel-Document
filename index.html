@@ -883,8 +883,28 @@ if('serviceWorker' in navigator){
   
 }
 
+// ═══ MIGRATE old data (entries_YYYY-MM → e_YYYY-MM) ═══
+function migrateData(){
+  var migrated = 0;
+  var keys = [];
+  for(var i=0;i<localStorage.length;i++){
+    var k = localStorage.key(i);
+    if(k && k.startsWith('entries_')) keys.push(k);
+  }
+  keys.forEach(function(k){
+    var ym  = k.replace('entries_','');
+    var nk  = 'e_'+ym;
+    if(!localStorage.getItem(nk)){
+      localStorage.setItem(nk, localStorage.getItem(k));
+      migrated++;
+    }
+  });
+  if(migrated) console.log('Migrated '+migrated+' months of data');
+}
+
 // ═══ INIT ═══
 function init(){
+  migrateData();
   var today=isoToday();
   currentYM=today.substring(0,7);
   document.getElementById('todayLbl').textContent=fmtBg(today);
