@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Пътна книжка">
 <meta name="theme-color" content="#1e1e1e">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0iIzFlMWUxZSIvPjxwYXRoIGQ9Ik0yNTYgNDIwIEwxNjAgMzIwIEwxNjAgMjAwIFExNjAgMTgwIDE4MCAxODAgTDMzMiAxODAgUTM1MiAxODAgMzUyIDIwMCBMMzUyIDMyMCBaIiBmaWxsPSIjMmQyZDJkIiBzdHJva2U9IiM0NDQiLz48cmVjdCB4PSIyNDgiIHk9IjIwMCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjMwIiByeD0iNCIgZmlsbD0iI2YwYTUwMCIvPjxyZWN0IHg9IjI0OCIgeT0iMjUyIiB3aWR0aD0iMTYiIGhlaWdodD0iMzAiIHJ4PSI0IiBmaWxsPSIjZjBhNTAwIi8+PHJlY3QgeD0iMjQ4IiB5PSIzMDQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIzMCIgcng9IjQiIGZpbGw9IiNmMGE1MDAiLz48cGF0aCBkPSJNMTMwIDI2MCBBMTMwIDEzMCAwIDAgMSAzODIgMjYwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0xMzAgMjYwIEExMzAgMTMwIDAgMCAxIDI5MCAxMzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2U1MzkzNSIgc3Ryb2tlLXdpZHRoPSIyOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjI1NiIgeTE9IjI2MCIgeDI9IjIwMCIgeTI9IjE1OCIgc3Ryb2tlPSIjZTUzOTM1IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNjAiIHI9IjE4IiBmaWxsPSIjZTUzOTM1Ii8+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjYwIiByPSI4IiBmaWxsPSIjZmZmIi8+PC9zdmc+">
 <title>Пътна книжка</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
@@ -877,12 +880,7 @@ if('serviceWorker' in navigator){
   var blob=new Blob([sw],{type:'text/javascript'});
   navigator.serviceWorker.register(URL.createObjectURL(blob),{scope:'./'}).catch(function(){});
 
-  var manifest={name:'Пътна книжка',short_name:'КМ Дневник',start_url:'./',display:'standalone',
-    background_color:'#1e1e1e',theme_color:'#1e1e1e',orientation:'portrait',
-    icons:[{src:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0iIzFlMWUxZSIvPjxwYXRoIGQ9Ik0yNTYgNDIwIEwxNjAgMzIwIEwxNjAgMjAwIFExNjAgMTgwIDE4MCAxODAgTDMzMiAxODAgUTM1MiAxODAgMzUyIDIwMCBMMzUyIDMyMCBaIiBmaWxsPSIjMmQyZDJkIiBzdHJva2U9IiM0NDQiLz48cmVjdCB4PSIyNDgiIHk9IjIwMCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjMwIiByeD0iNCIgZmlsbD0iI2YwYTUwMCIvPjxyZWN0IHg9IjI0OCIgeT0iMjUyIiB3aWR0aD0iMTYiIGhlaWdodD0iMzAiIHJ4PSI0IiBmaWxsPSIjZjBhNTAwIi8+PHJlY3QgeD0iMjQ4IiB5PSIzMDQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIzMCIgcng9IjQiIGZpbGw9IiNmMGE1MDAiLz48cGF0aCBkPSJNMTMwIDI2MCBBMTMwIDEzMCAwIDAgMSAzODIgMjYwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0xMzAgMjYwIEExMzAgMTMwIDAgMCAxIDI5MCAxMzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2U1MzkzNSIgc3Ryb2tlLXdpZHRoPSIyOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjI1NiIgeTE9IjI2MCIgeDI9IjIwMCIgeTI9IjE1OCIgc3Ryb2tlPSIjZTUzOTM1IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNjAiIHI9IjE4IiBmaWxsPSIjZTUzOTM1Ii8+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjYwIiByPSI4IiBmaWxsPSIjZmZmIi8+PC9zdmc+',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
-  var mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
-  var mLink=document.createElement('link');mLink.rel='manifest';mLink.href=URL.createObjectURL(mBlob);
-  document.head.appendChild(mLink);
+  
 }
 
 // ═══ INIT ═══
