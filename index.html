@@ -181,7 +181,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 
     <!-- KM input with embedded camera button -->
     <div class="km-entry-wrap">
-      <input class="km-big-input" type="number" id="kmInput" inputmode="numeric" placeholder="Въведи км..." oninput="onKmChange()">
+      <input class="km-big-input" type="tel" id="kmInput" inputmode="numeric" pattern="[0-9]*" placeholder="Въведи км..." oninput="onKmChange()" autocomplete="off">
       <button class="km-cam-btn" onclick="triggerCamera()" title="Снимай или качи снимка">
         <i class="ti ti-camera" aria-hidden="true"></i>
       </button>
@@ -317,13 +317,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 
 <!-- EDIT ENTRY MODAL -->
 <div class="modal-bg" id="editModal" onclick="if(event.target===this)closeModal('editModal')">
-  <div class="modal">
+  <div class="modal" style="max-height:90vh;overflow-y:auto">
     <h3>Редактирай запис</h3>
     <div class="fg-2 fg">
-      <div><label>Начален км.</label><input type="number" id="eStart" inputmode="numeric" style="font-size:18px;font-weight:600;text-align:center;padding:10px"></div>
-      <div><label>Краен км.</label><input type="number" id="eEnd" inputmode="numeric" style="font-size:18px;font-weight:600;text-align:center;padding:10px"></div>
+      <div><label>Начален км.</label><input type="tel" inputmode="numeric" id="eStart" style="font-size:18px;font-weight:600;text-align:center;padding:10px"></div>
+      <div><label>Краен км.</label><input type="tel" inputmode="numeric" id="eEnd" style="font-size:18px;font-weight:600;text-align:center;padding:10px"></div>
     </div>
-    <div class="fg"><label>Маршрут</label><textarea id="eRoute" style="width:100%;padding:10px;border-radius:var(--rs);border:0.5px solid var(--brd2);font-size:14px;resize:none;height:64px"></textarea></div>
+    <div class="fg-2 fg">
+      <div><label>От</label><input type="text" id="eFrom" list="citiesDL" autocomplete="off" oninput="buildEditRoute()"></div>
+      <div><label>До</label><input type="text" id="eTo" list="citiesDL" autocomplete="off" oninput="buildEditRoute()"></div>
+    </div>
+    <div class="fg"><label>Пълен маршрут</label><input type="text" id="eRoute" style="font-size:14px;padding:10px;width:100%;border-radius:var(--rs);border:0.5px solid var(--brd2)"></div>
     <input type="hidden" id="eDate">
     <div class="modal-acts">
       <button class="m-cancel" onclick="closeModal('editModal')">Отказ</button>
@@ -376,7 +380,8 @@ function saveEntry(){
   var km    = parseInt(raw);
   var route = document.getElementById('fRoute').value.trim();
   var date  = document.getElementById('fDate').value;
-  if(!km||isNaN(km)||km<10){toast('Въведи валиден километраж (само цифри)',true);return}
+  if(!km||isNaN(km)||km<1){toast('Въведи километраж',true);return}
+  if(km===getLastKm()&&!confirm('Километражът е същият като последния запис ('+km.toLocaleString('bg')+' км). Продължи?'))return
   if(!date){toast('Избери дата',true);return}
 
   var btn=document.getElementById('saveBtn');
@@ -648,7 +653,18 @@ function openEdit(i){
   document.getElementById('eEnd').value=e.end_km||'';
   document.getElementById('eRoute').value=e.route||'';
   document.getElementById('eDate').value=e.date;
+  // Parse from/to from route if possible
+  var parts=(e.route||'').split(' - ');
+  document.getElementById('eFrom').value=parts[0]||'';
+  document.getElementById('eTo').value=parts[1]||'';
   document.getElementById('editModal').classList.add('on');
+}
+
+function buildEditRoute(){
+  var from=document.getElementById('eFrom').value.trim();
+  var to=document.getElementById('eTo').value.trim();
+  if(from&&to) document.getElementById('eRoute').value=from+' - '+to+' - '+from;
+  else if(from) document.getElementById('eRoute').value=from;
 }
 function saveEdit(){
   var date=document.getElementById('eDate').value;
@@ -662,6 +678,10 @@ function saveEdit(){
   arr[idx].end_km=en;
   arr[idx].km_driven=en&&en>st?en-st:null;
   arr[idx].route=document.getElementById('eRoute').value.trim();
+  // Also update from/to display if route was changed via city fields
+  var ef=document.getElementById('eFrom').value.trim();
+  var et=document.getElementById('eTo').value.trim();
+  if(ef&&et&&!arr[idx].route) arr[idx].route=ef+' - '+et+' - '+ef;
   setEntries(ym,arr);
   closeModal('editModal');
   loadHistory();
@@ -1011,6 +1031,8 @@ function init(){
   document.getElementById('monthTtl').textContent=fmtMonth(currentYM);
   var lastKm=getLastKm();
   document.getElementById('prevKmDisplay').textContent=lastKm?lastKm.toLocaleString('bg')+' км':'— км';
+  // Pre-fill km input with last known value for easy editing
+  if(lastKm){ document.getElementById('kmInput').value=lastKm; onKmChange(); }
   applySettings();
   updateCitiesDL();
 }
