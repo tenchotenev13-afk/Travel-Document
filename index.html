@@ -261,7 +261,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
       <div class="fg"><label>Регистрационен номер</label><input type="text" id="sReg" style="text-transform:uppercase"></div>
       <div class="fg"><label>Марка и модел</label><input type="text" id="sMake"></div>
       <div class="fg"><label>Шофьор / Съставил</label><input type="text" id="sDriver" placeholder="Иван Петров"></div>
-      <div class="fg" style="margin:0"><label>Фирма</label><input type="text" id="sCompany" placeholder="ТЕМАКС ТЦ ЮГ ЕООД"></div>
+      <div class="fg"><label>Фирма</label><input type="text" id="sCompany" placeholder="ТЕМАКС ТЦ ЮГ ЕООД"></div>
+      <div class="fg" style="margin:0"><label>Маршрут по подразбиране</label><input type="text" id="sRoute" placeholder="Димитровград - Кърджали - Димитровград"></div>
     </div>
   </div>
 
@@ -409,9 +410,16 @@ function saveEntry(){
 
   toast('Записано!',false,true);
   document.getElementById('prevKmDisplay').textContent=km.toLocaleString('bg')+' км';
-  document.getElementById('kmInput').value='';
+  document.getElementById('kmInput').value=km; // keep last km pre-filled
   document.getElementById('kmDiff').classList.remove('on');
   document.getElementById('photoPreview').classList.remove('on');
+  // Remember last route for next day auto-fill
+  // Remember destination for next day auto-fill
+  if(route){
+    localStorage.setItem('patna_last_route', route);
+    var parts=route.split(' - ');
+    document.getElementById('fTo').value=parts[1]||'';
+  }
 
   btn.disabled=false;
   btn.innerHTML='<i class="ti ti-device-floppy"></i>Запази в пътна книжка';
@@ -899,7 +907,7 @@ function setCities(arr){localStorage.setItem('patna_cities',JSON.stringify(arr))
 function updateCitiesDL(){
   var dl=document.getElementById('citiesDL');
   if(!dl)return;
-  dl.innerHTML=getCities().map(function(c){return'<option value="'+c+"'>"}).join('');
+  dl.innerHTML=getCities().map(function(c){return'<option value="'+c+'">'+c+'</option>'}).join('');
 }
 function renderCityTags(){
   var el=document.getElementById('cityTags');if(!el)return;
@@ -924,6 +932,8 @@ function buildRoute(){
   var to=document.getElementById('fTo').value.trim();
   if(from&&to) document.getElementById('fRoute').value=from+' - '+to+' - '+from;
   else if(from) document.getElementById('fRoute').value=from;
+  // Auto-update last_route as user types
+  if(from&&to) localStorage.setItem('patna_last_route',from+' - '+to+' - '+from);
 }
 
 // ═══ SETTINGS ═══
@@ -935,14 +945,20 @@ function applySettings(){
   document.getElementById('sDriver').value = settings.driver||'';
   document.getElementById('sCompany').value= settings.company||'';
   document.getElementById('sGemini').value = GEMINI_KEY;
+  if(document.getElementById('sRoute')) document.getElementById('sRoute').value = settings.default_route||'';
   document.getElementById('sUrl').value    = API_URL;
-  var def = settings.default_route||'';
-  if(def){
-    var p=def.split(' - ');
-    document.getElementById('fFrom').value=p[0]||'';
-    document.getElementById('fTo').value=p[1]||'';
-    document.getElementById('fRoute').value=def;
+  // fFrom always starts with Димитровград (or saved default)
+  var homeCity = (settings.default_route||'').split(' - ')[0] || 'Димитровград';
+  var lastRoute = localStorage.getItem('patna_last_route') || settings.default_route || '';
+  var lastTo = '';
+  if(lastRoute){
+    var p=lastRoute.split(' - ');
+    lastTo = p[1] || '';
   }
+  document.getElementById('fFrom').value = homeCity;
+  document.getElementById('fTo').value   = lastTo;
+  if(lastTo) document.getElementById('fRoute').value = homeCity+' - '+lastTo+' - '+homeCity;
+  else document.getElementById('fRoute').value = '';
 }
 function saveSettings(){
   var gk=document.getElementById('sGemini').value.trim();
@@ -954,7 +970,7 @@ function saveSettings(){
     car_make:      document.getElementById('sMake').value.trim(),
     driver:        document.getElementById('sDriver').value.trim(),
     company:       document.getElementById('sCompany').value.trim(),
-    default_route: document.getElementById('fFrom').value.trim()+' - '+document.getElementById('fTo').value.trim()+' - '+document.getElementById('fFrom').value.trim()
+    default_route: document.getElementById('sRoute').value.trim()
   };
   localStorage.setItem('patna_settings',JSON.stringify(settings));
   applySettings();
