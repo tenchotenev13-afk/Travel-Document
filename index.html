@@ -405,7 +405,14 @@ function saveEntry(){
 
   // 3. Try sync
   if(API_URL){
-    apiCall({action:'add_entry',date:date,start_km:km,route:route,update_prev:'true'}).catch(function(){});
+    apiCall({
+      action:      'add_entry',
+      date:        date,
+      start_km:    km,
+      end_km:      '',
+      route:       encodeURIComponent(route),
+      update_prev: 'true'
+    }).catch(function(){});
   }
 
   toast('Записано!',false,true);
@@ -426,27 +433,33 @@ function saveEntry(){
 }
 
 function completePreviousEntry(todayKm, todayDate){
-  // Find most recent entry across months with no end_km
   var ym = todayDate.substring(0,7);
   var months = [ym];
-  // Also check previous month
   var d=new Date(todayDate); d.setDate(1); d.setMonth(d.getMonth()-1);
   months.push(d.getFullYear()+'-'+pad(d.getMonth()+1));
 
   for(var mi=0;mi<months.length;mi++){
     var arr = getEntries(months[mi]);
-    var updated = false;
-    // Find last entry before todayDate without end_km
     for(var i=arr.length-1;i>=0;i--){
-      if(arr[i].date >= todayDate) continue; // skip today or future
+      if(arr[i].date >= todayDate) continue;
       if(!arr[i].end_km && arr[i].start_km){
         arr[i].end_km    = todayKm;
         arr[i].km_driven = todayKm - arr[i].start_km;
-        updated = true;
-        break;
+        setEntries(months[mi], arr);
+        // Sync to Sheets
+        if(API_URL){
+          apiCall({
+            action:     'update_by_date',
+            date:       arr[i].date,
+            month_year: months[mi],
+            end_km:     todayKm,
+            km_driven:  arr[i].km_driven,
+            route:      encodeURIComponent(arr[i].route||'')
+          }).catch(function(){});
+        }
+        return;
       }
     }
-    if(updated){setEntries(months[mi],arr);break}
   }
 }
 
